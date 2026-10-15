@@ -1,0 +1,39 @@
+# Optional local send-only relay. Use with compose.yml in the same project.
+services:
+  nexus:
+    environment:
+      HAUNT_SYNC_SMTP_HOST: mailer
+      HAUNT_SYNC_SMTP_PORT: "587"
+      HAUNT_SYNC_SMTP_USERNAME: ""
+      HAUNT_SYNC_SMTP_PASSWORD: ""
+      HAUNT_SYNC_SMTP_CA_FILE: /run/haunt-mail/ca.crt
+    volumes:
+      - ${HAUNT_SYNC_MAIL_TLS_PATH:-../.local/sync-mail/tls}/ca.crt:/run/haunt-mail/ca.crt:ro
+    depends_on:
+      mailer:
+        condition: service_healthy
+  mailer:
+    image: haunt-sync-mail:local
+    build: ./mail-relay
+    restart: unless-stopped
+    stop_grace_period: 45s
+    security_opt: [no-new-privileges:true]
+    environment:
+      HAUNT_MAIL_HOST: ${HAUNT_SYNC_MAIL_HOST:?Set the mail relay hostname}
+      HAUNT_MAIL_DOMAIN: ${HAUNT_SYNC_MAIL_DOMAIN:?Set the sending domain}
+      HAUNT_MAIL_FROM: ${HAUNT_SYNC_MAIL_FROM:?Set the sender address}
+      HAUNT_MAIL_TRUSTED_NETWORK: ${HAUNT_SYNC_MAIL_TRUSTED_NETWORK:?Set the private Nexus network CIDR}
+    volumes:
+      - mail_queue:/var/spool/postfix
+      - mail_state:/var/lib/postfix
+      - ${HAUNT_SYNC_MAIL_TLS_PATH:-../.local/sync-mail/tls}:/tls:ro
+      - ${HAUNT_SYNC_MAIL_DKIM_PATH:-../.local/sync-mail/dkim}:/dkim:ro
+    healthcheck:
+      test: [CMD, python3, /usr/local/bin/haunt-mail-health]
+      interval: 10s
+      timeout: 6s
+      retries: 6
+      start_period: 30s
+volumes:
+  mail_queue:
+  mail_state:

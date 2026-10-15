@@ -1,0 +1,31 @@
+services:
+  nexus:
+    image: ${HAUNT_SYNC_IMAGE:-ghcr.io/example-git/haunt:sync-latest}
+    restart: unless-stopped
+    stop_grace_period: 90s
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: ["/tmp:size=32m,mode=1777"]
+    environment:
+      HAUNT_SYNC_HOST: ${HAUNT_SYNC_HOST:-}
+      HAUNT_SYNC_TUNNEL_TOKEN: ${HAUNT_SYNC_TUNNEL_TOKEN:-}
+      HAUNT_SYNC_QUICK_TUNNEL: ${HAUNT_SYNC_QUICK_TUNNEL:-false}
+      HAUNT_SYNC_DB_PASSWORD: ${HAUNT_SYNC_DB_PASSWORD:-}
+      HAUNT_SYNC_UPDATES_DIR: /updates
+      HAUNT_SYNC_SMTP_HOST: ${HAUNT_SYNC_SMTP_HOST:-}
+      HAUNT_SYNC_SMTP_PORT: ${HAUNT_SYNC_SMTP_PORT:-587}
+      HAUNT_SYNC_SMTP_USERNAME: ${HAUNT_SYNC_SMTP_USERNAME:-}
+      HAUNT_SYNC_SMTP_PASSWORD: ${HAUNT_SYNC_SMTP_PASSWORD:-}
+      HAUNT_SYNC_MAIL_FROM: ${HAUNT_SYNC_MAIL_FROM:-}
+    volumes:
+      - sync_data:/data
+      - ${HAUNT_SYNC_UPDATES_PATH:-../.local/sync-updates}:/updates:ro
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:8090/healthz]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 45s
+volumes:
+  sync_data:
