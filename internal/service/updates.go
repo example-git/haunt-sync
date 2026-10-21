@@ -24,8 +24,9 @@ type releaseArtifact struct {
 type releasePayload struct {
 	Version string `json:"version"`
 	Targets map[string]struct {
-		ASAR      releaseArtifact `json:"asar"`
-		Installer releaseArtifact `json:"installer"`
+		ASAR      releaseArtifact  `json:"asar"`
+		Installer releaseArtifact  `json:"installer"`
+		RPM       *releaseArtifact `json:"rpm,omitempty"`
 	} `json:"targets"`
 }
 
@@ -63,7 +64,14 @@ func releaseManifest(root *os.Root, name string) ([]byte, releasePayload, error)
 		if !ok {
 			return nil, payload, errors.New("missing target")
 		}
-		for _, asset := range []releaseArtifact{target.ASAR, target.Installer} {
+		assets := []releaseArtifact{target.ASAR, target.Installer}
+		if target.RPM != nil {
+			if !strings.HasPrefix(name, "linux-") || !strings.HasSuffix(target.RPM.File, ".rpm") {
+				return nil, payload, errors.New("invalid RPM installer")
+			}
+			assets = append(assets, *target.RPM)
+		}
+		for _, asset := range assets {
 			if !updateName.MatchString(asset.File) || !updateDigest.MatchString(asset.SHA256) || asset.Size < 1 || asset.Size > 1<<30 {
 				return nil, payload, errors.New("invalid artifact")
 			}
@@ -118,7 +126,11 @@ func updateHandler(directory string) http.Handler {
 		}
 		var artifact releaseArtifact
 		for _, target := range payload.Targets {
-			for _, asset := range []releaseArtifact{target.ASAR, target.Installer} {
+			assets := []releaseArtifact{target.ASAR, target.Installer}
+			if target.RPM != nil {
+				assets = append(assets, *target.RPM)
+			}
+			for _, asset := range assets {
 				if asset.File == parts[1] {
 					artifact = asset
 				}

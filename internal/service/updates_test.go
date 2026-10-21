@@ -24,15 +24,22 @@ func TestPublicUpdatesProductionHandler(t *testing.T) {
 	digest := sha256.Sum256(asset)
 	entry := releaseArtifact{File: "Haunt.asar", Size: int64(len(asset)), SHA256: hex.EncodeToString(digest[:])}
 	payload := releasePayload{Version: "0.5.0", Targets: map[string]struct {
-		ASAR      releaseArtifact `json:"asar"`
-		Installer releaseArtifact `json:"installer"`
+		ASAR      releaseArtifact  `json:"asar"`
+		Installer releaseArtifact  `json:"installer"`
+		RPM       *releaseArtifact `json:"rpm,omitempty"`
 	}{}}
 	for _, target := range []string{"win32-x64", "linux-x64", "linux-arm64", "darwin-arm64"} {
 		payload.Targets[target] = struct {
-			ASAR      releaseArtifact `json:"asar"`
-			Installer releaseArtifact `json:"installer"`
-		}{entry, entry}
+			ASAR      releaseArtifact  `json:"asar"`
+			Installer releaseArtifact  `json:"installer"`
+			RPM       *releaseArtifact `json:"rpm,omitempty"`
+		}{entry, entry, nil}
 	}
+	rpm := entry
+	rpm.File = "Haunt.rpm"
+	linux := payload.Targets["linux-x64"]
+	linux.RPM = &rpm
+	payload.Targets["linux-x64"] = linux
 	encoded, _ := json.Marshal(payload)
 	pub, key, _ := ed25519.GenerateKey(rand.Reader)
 	signature := ed25519.Sign(key, encoded)
@@ -43,6 +50,9 @@ func TestPublicUpdatesProductionHandler(t *testing.T) {
 		}
 	}
 	if err := os.WriteFile(filepath.Join(dir, "client-v0.5.0/Haunt.asar"), asset, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "client-v0.5.0/Haunt.rpm"), asset, 0600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "private.txt"), []byte("must not be served"), 0600); err != nil {
@@ -80,6 +90,9 @@ func TestPublicUpdatesProductionHandler(t *testing.T) {
 	}
 	if string(request("GET", "/client-updates/client-v0.5.0/Haunt.asar", "bytes=0-8", 206)) != string(asset[:9]) {
 		t.Fatal("range download differs")
+	}
+	if string(request("GET", "/client-updates/client-v0.5.0/Haunt.rpm", "", 200)) != string(asset) {
+		t.Fatal("RPM download differs")
 	}
 	if len(request("HEAD", "/client-updates/client-v0.5.0/Haunt.asar", "", 200)) != 0 {
 		t.Fatal("HEAD sent a body")
