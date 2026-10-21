@@ -45,7 +45,7 @@ deliberately temporary and starts with an empty disposable database after a full
 restart. Read the [deployment guide](docs/deployment.md) before choosing between
 them.
 
-The published image is `ghcr.io/example-git/haunt:sync-latest` for Linux amd64
+The published image is `ghcr.io/example-git/haunt-sync:latest` for Linux amd64
 and arm64. Keep sync data and community-server data in separate projects and
 volumes.
 

@@ -15,7 +15,7 @@ HTTPS gateway.
 ## Named Cloudflare Tunnel
 
 The published image is
-`ghcr.io/example-git/haunt:sync-latest` for Linux amd64 and arm64. It contains
+`ghcr.io/example-git/haunt-sync:latest` for Linux amd64 and arm64. It contains
 Haunt Sync, PostgreSQL, and cloudflared. No host ports are published.
 
 1. Create a remotely managed named tunnel, such as `haunt-nexus`.
@@ -50,7 +50,7 @@ URL-safe characters and must match the saved password on every later start.
 
 | Variable | Required | Meaning |
 | --- | --- | --- |
-| `HAUNT_SYNC_IMAGE` | No | Image reference; defaults to `ghcr.io/example-git/haunt:sync-latest` |
+| `HAUNT_SYNC_IMAGE` | No | Image reference; defaults to `ghcr.io/example-git/haunt-sync:latest` |
 | `HAUNT_SYNC_HOST` | Named mode | Public hostname without a scheme or path |
 | `HAUNT_SYNC_TUNNEL_TOKEN` | Named mode | Remotely managed Cloudflare tunnel token |
 | `HAUNT_SYNC_QUICK_TUNNEL` | No | Must be exactly `true` to select disposable mode |

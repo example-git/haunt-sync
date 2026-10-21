@@ -12,6 +12,9 @@ ARG HAUNT_WEB_CLIENT_ORIGIN
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} GOPROXY=off go build -trimpath -ldflags="-s -w -X main.version=${VERSION} -X github.com/example-git/haunt-sync/internal/service.HostedClientOrigin=${HAUNT_WEB_CLIENT_ORIGIN}" -o /haunt-sync ./cmd/haunt-sync
 FROM cloudflare/cloudflared:2026.10.0 AS tunnel
 FROM postgres:16-alpine
+LABEL org.opencontainers.image.source="https://github.com/example-git/haunt-sync"
+LABEL org.opencontainers.image.description="Haunt encrypted sync service with PostgreSQL and Cloudflare Tunnel"
+LABEL org.opencontainers.image.licenses="BSD-3-Clause"
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=build /haunt-sync /usr/local/bin/haunt-sync
 COPY --from=tunnel /usr/local/bin/cloudflared /usr/local/bin/cloudflared

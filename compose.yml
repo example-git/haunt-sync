@@ -1,6 +1,6 @@
 services:
   nexus:
-    image: ${HAUNT_SYNC_IMAGE:-ghcr.io/example-git/haunt:sync-latest}
+    image: ${HAUNT_SYNC_IMAGE:-ghcr.io/example-git/haunt-sync:latest}
     restart: unless-stopped
     stop_grace_period: 90s
     read_only: true
