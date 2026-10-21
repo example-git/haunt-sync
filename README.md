@@ -57,8 +57,8 @@ volumes.
   keys, device metadata, and revision state.
 - Email can restore account access but cannot decrypt an existing snapshot by
   itself.
-- Browser access requires explicit desktop approval and receives only one
-  community origin's key.
+- Community-hosted browsers receive only their origin's key through pairing;
+  trusted standalone clients can sign in for full-account sync.
 - Operators can observe metadata and can withhold, corrupt, or replay
   ciphertexts. The Go OPAQUE implementation has not received an independent
   security audit.

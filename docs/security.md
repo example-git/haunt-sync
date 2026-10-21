@@ -7,7 +7,7 @@ have not received an independent security audit.
 
 ## Secrets and encrypted payloads
 
-Desktop sign-in uses a master password and a private sync keyword. Neither value,
+Trusted-client sign-in uses a master password and a private sync keyword. Neither value,
 nor the locally computed keyword salt or encryption root, is sent to the
 service.
 
@@ -25,9 +25,12 @@ Stored device tokens are hashed.
 
 ## Desktop and browser boundaries
 
-Desktop holds the full encrypted snapshot and can synchronize multiple community
-accounts. A community web client can synchronize only its own canonical HTTPS
-origin.
+Electron and the dedicated standalone web client hold the full encrypted
+snapshot and can synchronize multiple community accounts. Actions builds trust
+the standalone client's published origin; operators can explicitly configure
+additional trusted origins. The standalone application's host supplies its code
+and must be trusted with the full client key hierarchy. A community-hosted web
+client can synchronize only its own canonical HTTPS origin.
 
 For browser pairing:
 

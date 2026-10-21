@@ -56,7 +56,19 @@ URL-safe characters and must match the saved password on every later start.
 | `HAUNT_SYNC_QUICK_TUNNEL` | No | Must be exactly `true` to select disposable mode |
 | `HAUNT_SYNC_DB_PASSWORD` | No | Optional fixed bundled-database password |
 | `HAUNT_SYNC_UPDATES_PATH` | No | Host directory containing verified update releases |
+| `HAUNT_SYNC_TRUSTED_CLIENT_ORIGINS` | No | Exact HTTPS origins of trusted standalone web clients, separated by commas |
 | `HAUNT_SYNC_SMTP_*` | No | Optional mail transport; see [Mail](mail.md) |
+
+## Standalone web clients
+
+Actions builds include the hosted Haunt web client's origin from its published
+deployment record. It is accepted automatically alongside Electron's origin.
+Set `HAUNT_SYNC_TRUSTED_CLIENT_ORIGINS` for additional trusted clients or local
+builds. Values are exact HTTPS origins; paths and wildcards are rejected.
+
+Only include client hosts trusted to handle master passwords and the full key
+hierarchy. Other web origins remain limited to delegated browser pairing and
+scoped vault access. Electron's application origin remains supported by default.
 
 ## Disposable Quick Tunnel
 

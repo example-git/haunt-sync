@@ -14,8 +14,8 @@ Community web client ── scoped pairing grant ───┼── Haunt Sync �
 Desktop updater ── public signed downloads ─────┘
 ```
 
-The desktop client owns the complete encrypted snapshot and global key hierarchy.
-A signed-in desktop synchronizes once per minute while open. A community web
+Desktop and trusted standalone web clients own the complete encrypted snapshot
+and global key hierarchy. They synchronize once per minute while open. A community web
 client can receive only the key for its exact HTTPS origin after
 approval from an unlocked desktop. The public update feed is independent of sync
 accounts and contains already signed release artifacts.

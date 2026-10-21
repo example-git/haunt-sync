@@ -10,20 +10,29 @@ import (
 	"strings"
 )
 
+var HostedClientOrigin string
+
 type Config struct {
-	Issuer            string
-	DatabaseURL       string
-	Schema            string
-	AllowLoopbackHTTP bool
-	SMTPHost          string
-	SMTPPort          string
-	SMTPUsername      string
-	SMTPPassword      string
-	SMTPCAFile        string
-	MailFrom          string
-	TrustedProxies    string
-	UpdatesDirectory  string
-	proxies           []netip.Prefix
+	Issuer               string
+	DatabaseURL          string
+	Schema               string
+	AllowLoopbackHTTP    bool
+	SMTPHost             string
+	SMTPPort             string
+	SMTPUsername         string
+	SMTPPassword         string
+	SMTPCAFile           string
+	MailFrom             string
+	TrustedProxies       string
+	TrustedClientOrigins string
+	trustedClients       map[string]struct{}
+	UpdatesDirectory     string
+	proxies              []netip.Prefix
+}
+
+func (c Config) trustedClient(origin string) bool {
+	_, trusted := c.trustedClients[origin]
+	return origin == "https://app.chatxo.local" || trusted
 }
 
 func Origin(raw string, loopback bool) (string, error) {
@@ -83,6 +92,24 @@ func (c *Config) Validate() error {
 		}
 		if strings.ContainsAny(c.SMTPHost+c.SMTPPort+c.SMTPUsername, "\r\n\x00") {
 			return errors.New("invalid SMTP configuration")
+		}
+	}
+	c.trustedClients = make(map[string]struct{})
+	if HostedClientOrigin != "" {
+		origin, err := Origin(HostedClientOrigin, false)
+		if err != nil || strings.Contains(HostedClientOrigin, "*") {
+			return errors.New("invalid built-in web client origin")
+		}
+		c.trustedClients[origin] = struct{}{}
+	}
+	if c.TrustedClientOrigins != "" {
+		for _, raw := range strings.Split(c.TrustedClientOrigins, ",") {
+			value := strings.TrimSpace(raw)
+			origin, err := Origin(value, c.AllowLoopbackHTTP)
+			if err != nil || strings.Contains(value, "*") {
+				return errors.New("HAUNT_SYNC_TRUSTED_CLIENT_ORIGINS requires exact HTTPS origins")
+			}
+			c.trustedClients[origin] = struct{}{}
 		}
 	}
 	c.proxies = nil

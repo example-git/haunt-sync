@@ -15,13 +15,20 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Read hosted client origin
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/example-git/haunt-client/contents/web-deployment.json --jq '.content' | base64 --decode > "$RUNNER_TEMP/web-deployment.json"
+          origin=$(python3 -c 'import json,re,sys; value=json.load(open(sys.argv[1])); assert value["version"] == 1; origin=value["origin"]; assert re.fullmatch(r"https://[a-z0-9][a-z0-9.-]*", origin); print(origin)' "$RUNNER_TEMP/web-deployment.json")
+          echo "HAUNT_WEB_CLIENT_ORIGIN=$origin" >> "$GITHUB_ENV"
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
       - name: Check Go formatting
         run: test -z "$(gofmt -l cmd internal)"
       - run: go vet ./...
-      - run: go test -race ./...
+      - run: go test -race -ldflags="-X github.com/example-git/haunt-sync/internal/service.HostedClientOrigin=$HAUNT_WEB_CLIENT_ORIGIN" ./...
       - name: Check Python entry points
         run: python3 -m py_compile deploy/entrypoint.py mail-relay/entrypoint.py mail-relay/health.py scripts/check-docs.py scripts/check-repository.py
       - name: Check Compose model

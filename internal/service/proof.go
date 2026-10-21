@@ -117,7 +117,7 @@ func (s *Service) authenticate(r *http.Request) (Device, error) {
 	if strings.HasPrefix(device.Scope, "server:") && requestOrigin != "" && requestOrigin != device.Origin {
 		return device, problem(403, "origin_scope_mismatch")
 	}
-	if (device.Scope == "full" || device.Scope == "email") && requestOrigin != "" && requestOrigin != "https://app.chatxo.local" {
+	if (device.Scope == "full" || device.Scope == "email") && requestOrigin != "" && !s.Config.trustedClient(requestOrigin) {
 		return device, problem(403, "web_scope_required")
 	}
 	return device, nil

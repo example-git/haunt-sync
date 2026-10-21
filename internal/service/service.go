@@ -208,8 +208,7 @@ func (s *Service) Handler() http.Handler {
 		}
 		origin := r.Header.Get("Origin")
 		if origin != "" {
-			own := origin == "https://app.chatxo.local"
-			if !own {
+			if !s.Config.trustedClient(origin) {
 				if _, err := Origin(origin, s.Config.AllowLoopbackHTTP); err != nil {
 					fail(w, problem(403, "untrusted_origin"))
 					return

@@ -66,7 +66,7 @@ func (s *Service) authorizeApprove(w http.ResponseWriter, r *http.Request) error
 	if device.Scope != "full" {
 		return problem(403, "full_scope_required")
 	}
-	if origin := r.Header.Get("Origin"); origin != "" && origin != "https://app.chatxo.local" {
+	if origin := r.Header.Get("Origin"); origin != "" && !s.Config.trustedClient(origin) {
 		return problem(403, "desktop_approval_required")
 	}
 	var input struct {

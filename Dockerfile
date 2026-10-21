@@ -8,7 +8,8 @@ COPY cmd ./cmd
 COPY internal ./internal
 ARG TARGETARCH
 ARG VERSION=development
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} GOPROXY=off go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /haunt-sync ./cmd/haunt-sync
+ARG HAUNT_WEB_CLIENT_ORIGIN
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} GOPROXY=off go build -trimpath -ldflags="-s -w -X main.version=${VERSION} -X github.com/example-git/haunt-sync/internal/service.HostedClientOrigin=${HAUNT_WEB_CLIENT_ORIGIN}" -o /haunt-sync ./cmd/haunt-sync
 FROM cloudflare/cloudflared:2026.10.0 AS tunnel
 FROM postgres:16-alpine
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
