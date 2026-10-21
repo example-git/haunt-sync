@@ -27,13 +27,12 @@ python3 scripts/check-docs.py
 ```
 
 Tests that need external fixtures skip when their explicit environment is absent.
-A passing fast suite does not establish end-to-end restore behavior.
 
 ## Database and browser integration
 
-Use a dedicated PostgreSQL 16 database at `127.0.0.1:32768`, conventionally
-named `haunt_sync_iteration`. Never point tests at a personal or production
-database.
+The integration test requires a dedicated PostgreSQL 16 database named
+`haunt_sync_iteration` at `127.0.0.1:32768`. Never point tests at a personal or
+production database.
 
 Set:
 
@@ -86,11 +85,9 @@ Markdown links without requiring external network access.
 
 ## Required end-to-end outcomes
 
-Before calling a release path verified, exercise real browser/Go registration
-and login, wrong-password and transcript-tamper rejection, encrypted upload and
-fresh-client restore, database inspection for synthetic plaintext credentials,
-concurrent users and revisions, indefinite sessions, logout and revocation,
+Release verification requires browser/Go registration and login, wrong-password
+and transcript-tamper rejection, encrypted upload and fresh-client restore,
+database inspection for synthetic plaintext credentials, concurrent users and
+revisions, indefinite sessions, logout and revocation,
 PKCE mismatch and replay, redirect manipulation, origin forgery, key
 substitution, and cross-scope denial.
-
-Unit tests alone do not establish those outcomes.

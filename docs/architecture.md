@@ -59,7 +59,7 @@ Public discovery and health:
 - `GET /v1/config`
 - `GET /.well-known/oauth-authorization-server`
 
-Authenticated API families:
+API families:
 
 - `/v1/auth/*` for OPAQUE registration and login.
 - `/v1/vault/*` and `/v1/vaults` for encrypted snapshots.

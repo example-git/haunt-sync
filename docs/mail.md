@@ -39,7 +39,7 @@ Set these values in the protected `.env` file:
 
 ```dotenv
 COMPOSE_FILE=compose.yml:compose.mail.yml
-HAUNT_SYNC_MAIL_FROM=haunt@example.com
+HAUNT_SYNC_MAIL_FROM=haunt@your-domain.example
 HAUNT_SYNC_MAIL_HOST=mail.nexus.your-domain.example
 HAUNT_SYNC_MAIL_DOMAIN=your-domain.example
 HAUNT_SYNC_MAIL_TRUSTED_NETWORK=YOUR_EXACT_PROJECT_NETWORK_CIDR
@@ -73,9 +73,8 @@ Direct outbound mail requires:
 - A `haunt._domainkey` TXT record containing the DKIM public key.
 - An appropriate DMARC policy for the sender domain.
 
-Cloudflare Tunnel does not deliver SMTP and does not authorize DNS changes.
+Cloudflare Tunnel does not deliver SMTP.
 Undeliverable messages expire from the relay queue after ten minutes.
 
-Container health proves only local SMTP readiness. Send a real verification
-message to a controlled recipient and confirm delivery before declaring mail
-operational.
+Container health checks local SMTP readiness. Verify end-to-end delivery by
+sending a verification message to a controlled recipient.

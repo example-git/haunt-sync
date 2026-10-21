@@ -22,5 +22,5 @@ python3 scripts/check-docs.py
 ```
 
 The full browser/Go and container checks require the isolated fixtures described
-in [README.md](README.md). Report vulnerabilities through the private process in
+in [Development](docs/development.md#database-and-browser-integration). Report vulnerabilities through the private process in
 [SECURITY.md](SECURITY.md), not in a public issue.

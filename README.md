@@ -1,3 +1,5 @@
+![Haunt](assets/haunt-wordmark.png)
+
 # Haunt Sync
 
 Haunt Sync is an optional, independently hosted service for synchronizing
