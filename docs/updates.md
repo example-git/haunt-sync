@@ -27,8 +27,8 @@ staging directory and run:
 python3 scripts/import-sync-updates.py /path/to/downloaded/release
 ```
 
-The importer checks the pinned client publisher key and all eight artifact
-hashes before publishing the manifest. It preserves the signed bytes and refuses
+The importer checks the pinned client publisher key and every artifact hash,
+including Linux RPM installers, before publishing the manifest. It preserves the signed bytes and refuses
 to replace an existing version with different files.
 
 The hub Compose configuration mounts `.local/sync-updates` read-only at
