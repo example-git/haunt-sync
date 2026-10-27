@@ -48,6 +48,42 @@ Concurrent writes compare the expected revision. Independent edits can merge in
 the client; competing edits require an explicit user decision instead of silent
 last-write-wins replacement.
 
+Private message archives store independent `archive-chunk:<scope>:<chunk-hash>`
+vaults, where scope is `full` or `server:<origin-hash>`. The chunk hash is SHA-256
+of the local archive identity; message metadata remains inside the ciphertext.
+Permissions and encryption keys follow the corresponding settings scope, with
+distinct authenticated data for every chunk and revision. Clients gzip at most
+100 rows per chunk and process chunks individually. Explicit archive deletions
+win over older copies. The `archive:<scope>` vault holds a small version-2 marker;
+legacy version-1 snapshots are replaced only after every chunk is uploaded.
+
+`GET /v1/archive/{scope}?after=N&through=M` lists at most 200 changed chunk names,
+revisions and sequence numbers. The first response fixes `through` to the current
+account sequence; following pages retain that boundary. Vault writes serialize
+sequence allocation under the account lock, preventing commit-order gaps.
+Clients persist per-chunk revision/digest checkpoints and advance the cursor only
+after processing a page set. A separate observed-sequence checkpoint is saved
+atomically with each chunk acknowledgement, detecting rollback even between a
+partial upload and the next scan. Interrupted uploads retain completed checkpoints.
+No aggregate archive-size cap or whole-history manifest is required.
+
+Password changes and recovery start with `paged_vaults: true`. The service records
+starting revisions; `GET /v1/recovery/{challenge}/vault` returns one pending vault,
+and `PUT /v1/recovery/{challenge}/vault/{scope}` stages its encrypted replacement.
+An ordered SHA-256 chain binds every staged ciphertext to the signed finish
+request (`staged_vaults: true`). Finalization verifies complete coverage and exact
+starting revisions under the account lock, then atomically replaces all payloads,
+advances their change sequences, rotates credentials and revokes old devices.
+Staging expires after 15 idle minutes. Abandoned stages never
+change current vaults and expire with their challenge. Legacy inline migrations
+retain their 256-vault/128 MiB request bounds; paged migrations have no such
+aggregate request or vault-count limit.
+
+`GET /v1/vault/{scope}?known_revision=N` returns
+`{ "revision": N, "ciphertext": null, "unchanged": true }` when the revision
+matches. The query avoids reading or transferring the ciphertext in that case.
+A changed revision returns the encrypted snapshot as usual.
+
 The issuer and OPAQUE server identity are persistent instance identity. Changing
 the issuer on an existing database is not a rename operation and is rejected.
 
@@ -63,6 +99,7 @@ API families:
 
 - `/v1/auth/*` for OPAQUE registration and login.
 - `/v1/vault/*` and `/v1/vaults` for encrypted snapshots.
+- `/v1/archive/*` for paged archive changes.
 - `/v1/devices/*` for device listing and revocation.
 - `/v1/oauth/*` for browser pairing.
 - `/v1/email/*` and `/v1/recovery/*` for optional verified recovery.

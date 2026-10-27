@@ -39,14 +39,28 @@ Set:
 ```sh
 export HAUNT_SYNC_TEST_DATABASE_URL='postgres://USER:PASSWORD@127.0.0.1:32768/haunt_sync_iteration?sslmode=disable'
 export HAUNT_SYNC_CLIENT_CHECKOUT='/path/to/haunt-client'
-go test -race ./... -count=1 -timeout 180s
+go test -race ./... -count=1 -timeout 8m
 ```
 
 The integration test creates a disposable schema, launches the real browser
 OPAQUE library against production Go handlers, and checks registration, login,
-tamper rejection, encrypted storage, and synthetic plaintext absence. Rendered
+tamper rejection, encrypted storage, and synthetic plaintext absence. The archive
+scale case transfers more than 20 MiB across 400 chunks, checks one-chunk edits
+and unchanged sync traffic, restores a fresh store, and rotates 401 vaults through
+staged migration. Rendered
 checks additionally require a disposable Haunt community fixture and a built
 web client.
+
+In a hub checkout, `server/internal/clienttest` also provides `TestSyncClient`.
+Build `client/dist`, set `HAUNT_SYNC_E2E=1`, `HAUNT_CLIENT_DIR` to the absolute
+client checkout, and both isolated database URLs, then run
+`go test -tags=webclient ./internal/clienttest -run '^TestSyncClient$' -count=1 -v -timeout=10m`
+from `server/`. The fixture reserves `127.0.0.1:5173` for the client and creates
+disposable community and Sync data. `CHROME_PATH` can select a local Chromium
+binary. It verifies scheduled uploads, retained text on a fresh client, scoped
+browser pairing, key rotation and failed-resync recovery through the UI.
+Set `HAUNT_SYNC_TEST_FILE=tests/sync-ui.test.ts` to run only the rendered case
+while iterating on UI behavior; omit it to run the complete protocol suite.
 
 Use only synthetic accounts and isolated browsers.
 

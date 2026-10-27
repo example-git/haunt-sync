@@ -20,6 +20,7 @@ func (s *Service) recoveryStart(w http.ResponseWriter, r *http.Request) error {
 	}
 	var input struct {
 		Request string `json:"request"`
+		Paged   bool   `json:"paged_vaults"`
 	}
 	if err = decode(w, r, &input, 8192); err != nil {
 		return err
@@ -43,6 +44,38 @@ func (s *Service) recoveryStart(w http.ResponseWriter, r *http.Request) error {
 		return problem(400, "invalid_auth_message")
 	}
 	id := randomID()
+	if input.Paged {
+		tx, err := s.Pool.Begin(r.Context())
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback(r.Context())
+		var account string
+		if err = tx.QueryRow(r.Context(), `SELECT id FROM accounts WHERE id=$1 FOR SHARE`, device.AccountID).Scan(&account); err != nil {
+			return err
+		}
+		var active bool
+		if err = tx.QueryRow(r.Context(), `SELECT revoked_at IS NULL FROM devices WHERE id=$1`, device.ID).Scan(&active); err != nil {
+			return err
+		}
+		if !active {
+			return problem(401, "authentication_failed")
+		}
+		if _, err = tx.Exec(r.Context(), `INSERT INTO challenges(id,kind,username,account_id,credential_id,proof_key,expires_at) VALUES($1,'recovery',$2,$3,$4,$5,clock_timestamp()+interval '15 minutes')`, id, name, device.AccountID, credentialID, public); err != nil {
+			return err
+		}
+		if _, err = tx.Exec(r.Context(), `INSERT INTO recovery_batches(challenge_id,digest) VALUES($1,$2)`, id, base64.RawURLEncoding.EncodeToString(hash("haunt-sync-migration-v1"))); err != nil {
+			return err
+		}
+		if _, err = tx.Exec(r.Context(), `INSERT INTO recovery_vaults(challenge_id,scope,expected_revision) SELECT $1,scope,revision FROM vaults WHERE account_id=$2`, id, device.AccountID); err != nil {
+			return err
+		}
+		if err = tx.Commit(r.Context()); err != nil {
+			return err
+		}
+		write(w, 200, map[string]any{"challenge_id": id, "account_id": device.AccountID, "username": name, "response": base64.RawURLEncoding.EncodeToString(reply.Serialize()), "paged_vaults": true})
+		return nil
+	}
 	if _, err = s.Pool.Exec(r.Context(), `INSERT INTO challenges(id,kind,username,account_id,credential_id,proof_key,expires_at) VALUES($1,'recovery',$2,$3,$4,$5,clock_timestamp()+interval '2 minutes')`, id, name, device.AccountID, credentialID, public); err != nil {
 		return err
 	}
@@ -90,6 +123,7 @@ func (s *Service) recoveryFinish(w http.ResponseWriter, r *http.Request) error {
 	}
 	var input struct {
 		Challenge       string          `json:"challenge_id"`
+		Staged          bool            `json:"staged_vaults"`
 		Record          string          `json:"record"`
 		Wrapped         Ciphertext      `json:"wrapped_key"`
 		Proof           string          `json:"recovery_proof"`
@@ -122,8 +156,12 @@ func (s *Service) recoveryFinish(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	defer tx.Rollback(r.Context())
+	var account string
+	if err = tx.QueryRow(r.Context(), `SELECT id FROM accounts WHERE id=$1 FOR UPDATE`, device.AccountID).Scan(&account); err != nil {
+		return err
+	}
 	var public json.RawMessage
-	err = tx.QueryRow(r.Context(), `DELETE FROM challenges WHERE id=$1 AND kind='recovery' AND account_id=$2 AND expires_at>clock_timestamp() RETURNING proof_key`, input.Challenge, device.AccountID).Scan(&public)
+	err = tx.QueryRow(r.Context(), `SELECT proof_key FROM challenges WHERE id=$1 AND kind='recovery' AND account_id=$2 AND expires_at>clock_timestamp() FOR UPDATE`, input.Challenge, device.AccountID).Scan(&public)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return problem(400, "challenge_expired_or_used")
 	}
@@ -168,8 +206,8 @@ func (s *Service) recoveryFinish(w http.ResponseWriter, r *http.Request) error {
 	if !active {
 		return problem(401, "authentication_failed")
 	}
-	if input.Vaults != nil {
-		if input.RecoveryWrapped == nil || len(*input.Vaults) > 256 {
+	if input.Vaults != nil || input.Staged {
+		if input.RecoveryWrapped == nil || (input.Staged && input.Vaults != nil) || (input.Vaults != nil && len(*input.Vaults) > 256) {
 			return problem(400, "invalid_migration")
 		}
 		if err = input.RecoveryWrapped.validate(4096); err != nil {
@@ -177,20 +215,30 @@ func (s *Service) recoveryFinish(w http.ResponseWriter, r *http.Request) error {
 		}
 		values := []any{}
 		seen := map[string]bool{}
-		for _, vault := range *input.Vaults {
-			if seen[vault.Scope] || vault.Expected < 1 || vault.Expected > 1<<52 {
-				return problem(400, "invalid_migration")
+		if input.Vaults != nil {
+			for _, vault := range *input.Vaults {
+				if seen[vault.Scope] || vault.Expected < 1 || vault.Expected > 1<<52 {
+					return problem(400, "invalid_migration")
+				}
+				if err = vaultScope(Device{Scope: "full"}, vault.Scope); err != nil {
+					return err
+				}
+				if err = vault.Ciphertext.validate(30 << 20); err != nil {
+					return err
+				}
+				seen[vault.Scope] = true
+				values = append(values, []any{vault.Scope, vault.Expected, vault.Ciphertext.Version, vault.Ciphertext.Nonce, vault.Ciphertext.Data})
 			}
-			if err = vaultScope(Device{Scope: "full"}, vault.Scope); err != nil {
-				return err
-			}
-			if err = vault.Ciphertext.validate(30 << 20); err != nil {
-				return err
-			}
-			seen[vault.Scope] = true
-			values = append(values, []any{vault.Scope, vault.Expected, vault.Ciphertext.Version, vault.Ciphertext.Nonce, vault.Ciphertext.Data})
 		}
 		encoded, _ := json.Marshal(values)
+		migrationHash := base64.RawURLEncoding.EncodeToString(hash(string(encoded)))
+		if input.Staged {
+			if err = tx.QueryRow(r.Context(), `SELECT digest FROM recovery_batches WHERE challenge_id=$1`, input.Challenge).Scan(&migrationHash); errors.Is(err, pgx.ErrNoRows) {
+				return problem(400, "invalid_migration")
+			} else if err != nil {
+				return err
+			}
+		}
 		recoveryHash := base64.RawURLEncoding.EncodeToString(hash("1\x00" + input.RecoveryWrapped.Nonce + "\x00" + input.RecoveryWrapped.Data))
 		if _, _, err = proofKey(input.RecoveryPublic); err != nil {
 			return err
@@ -208,26 +256,54 @@ func (s *Service) recoveryFinish(w http.ResponseWriter, r *http.Request) error {
 		if claims.RecoveryPublicHash != base64.RawURLEncoding.EncodeToString(hash(string(publicEncoded))) {
 			return problem(403, "invalid_recovery_public_key_proof")
 		}
-		if claims.VaultsHash != base64.RawURLEncoding.EncodeToString(hash(string(encoded))) || claims.RecoveryWrappedHash != recoveryHash {
+		if claims.VaultsHash != migrationHash || claims.RecoveryWrappedHash != recoveryHash {
 			return problem(403, "invalid_migration_proof")
 		}
 		var count int
 		if err = tx.QueryRow(r.Context(), `SELECT count(*) FROM vaults WHERE account_id=$1`, device.AccountID).Scan(&count); err != nil {
 			return err
 		}
-		if count != len(*input.Vaults) {
-			return problem(409, "migration_conflict")
-		}
-		for _, vault := range *input.Vaults {
-			ciphertext, _ := json.Marshal(vault.Ciphertext)
-			tag, e := tx.Exec(r.Context(), `UPDATE vaults SET revision=revision+1,ciphertext=$3,updated_at=clock_timestamp() WHERE account_id=$1 AND scope=$2 AND revision=$4`, device.AccountID, vault.Scope, ciphertext, vault.Expected)
-			if e != nil {
-				return e
+		if input.Staged {
+			var staged int
+			var mismatch bool
+			if err = tx.QueryRow(r.Context(), `SELECT count(*) FROM recovery_vaults WHERE challenge_id=$1 AND ciphertext IS NOT NULL`, input.Challenge).Scan(&staged); err != nil {
+				return err
 			}
-			if tag.RowsAffected() != 1 {
+			if err = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM vaults v LEFT JOIN recovery_vaults m ON m.challenge_id=$2 AND m.scope=v.scope WHERE v.account_id=$1 AND (m.scope IS NULL OR m.ciphertext IS NULL OR m.expected_revision<>v.revision))`, device.AccountID, input.Challenge).Scan(&mismatch); err != nil {
+				return err
+			}
+			if staged != count || mismatch {
 				return problem(409, "migration_conflict")
 			}
+			if _, err = tx.Exec(r.Context(), `UPDATE vaults v SET revision=v.revision+1,ciphertext=m.ciphertext,updated_at=clock_timestamp() FROM recovery_vaults m WHERE m.challenge_id=$2 AND v.account_id=$1 AND v.scope=m.scope`, device.AccountID, input.Challenge); err != nil {
+				return err
+			}
+		} else {
+			if count != len(*input.Vaults) {
+				return problem(409, "migration_conflict")
+			}
+			for _, vault := range *input.Vaults {
+				ciphertext, _ := json.Marshal(vault.Ciphertext)
+				tag, e := tx.Exec(r.Context(), `UPDATE vaults SET revision=revision+1,ciphertext=$3,updated_at=clock_timestamp() WHERE account_id=$1 AND scope=$2 AND revision=$4`, device.AccountID, vault.Scope, ciphertext, vault.Expected)
+				if e != nil {
+					return e
+				}
+				if tag.RowsAffected() != 1 {
+					return problem(409, "migration_conflict")
+				}
+			}
 		}
+		var sequence int64
+		if err = tx.QueryRow(r.Context(), `SELECT vault_sequence FROM accounts WHERE id=$1`, device.AccountID).Scan(&sequence); err != nil {
+			return err
+		}
+		if _, err = tx.Exec(r.Context(), `WITH numbered AS (SELECT scope,row_number() OVER (ORDER BY scope) AS position FROM vaults WHERE account_id=$1) UPDATE vaults v SET change_sequence=$2+n.position FROM numbered n WHERE v.account_id=$1 AND v.scope=n.scope`, device.AccountID, sequence); err != nil {
+			return err
+		}
+		if _, err = tx.Exec(r.Context(), `UPDATE accounts SET vault_sequence=vault_sequence+$2 WHERE id=$1`, device.AccountID, count); err != nil {
+			return err
+		}
+
 		recovery, _ := json.Marshal(input.RecoveryWrapped)
 		if _, err = tx.Exec(r.Context(), `UPDATE accounts SET recovery_wrapped_key=$2,recovery_public_key=$3 WHERE id=$1`, device.AccountID, recovery, input.RecoveryPublic); err != nil {
 			return err

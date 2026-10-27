@@ -25,8 +25,9 @@ OPAQUE key material are part of instance identity.
 
 ## Backups
 
-Sync is not itself an archival backup. Clients should keep deliberate encrypted
-client backups even when the service database is protected.
+Sync keeps the latest encrypted message archive and settings snapshots. Clients
+can also export local message text and encrypted client backups; these remain
+available independently of service database backups.
 
 For a consistent service backup:
 
@@ -111,8 +112,9 @@ requests.
 
 ## Retention and loss
 
-The service stores current revisions and does not promise archival history or
-operator recovery of plaintext. Losing the instance cannot remove local client
+The service stores current settings and private text-archive snapshots. It does
+not retain prior vault revisions or provide operator recovery of plaintext.
+Losing the instance cannot remove local client
 data, but data held only by that instance is unrecoverable.
 
 Users can select a replacement instance, create an account, and upload from an
