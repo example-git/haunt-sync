@@ -3,12 +3,12 @@
 # Haunt Sync
 
 Haunt Sync is an optional, independently hosted service for synchronizing
-encrypted Haunt settings and saved sign-ins across a user's devices. A group can
+encrypted Haunt settings, saved sign-ins and private message text archives across a user's devices. A group can
 run its own instance without creating a project-wide account service or coupling
 sync availability to any community server.
 
 Clients remain the working copy. The service stores current encrypted snapshots
-and wrapped keys; it cannot decrypt them, and it is not an archival backup.
+and wrapped keys; it cannot decrypt them or retain prior snapshot revisions.
 Ordinary Haunt sign-in continues to work when sync is disabled or unavailable.
 
 ## Choose a starting point

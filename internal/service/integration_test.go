@@ -83,7 +83,20 @@ func TestBrowserProtocol(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for _, file := range []string{"tests/sync-integration.test.ts", "tests/sync-secret-change.test.ts", "tests/sync-ui.test.ts"} {
+	files := []string{"tests/sync-integration.test.ts", "tests/sync-secret-change.test.ts", "tests/sync-archive-scale.test.ts", "tests/sync-ui.test.ts"}
+	if selected := os.Getenv("HAUNT_SYNC_TEST_FILE"); selected != "" {
+		found := false
+		for _, file := range files {
+			if file == selected {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatal("HAUNT_SYNC_TEST_FILE must name a supported sync test file")
+		}
+		files = []string{selected}
+	}
+	for _, file := range files {
 		// Independent scenarios get a fresh test-only rate counter. The production
 		// limit is unchanged and remains active throughout each complete scenario.
 		if _, err = s.Pool.Exec(t.Context(), `DELETE FROM rate_limits`); err != nil {

@@ -90,3 +90,18 @@ CREATE TABLE IF NOT EXISTS email_challenges (
  consumed_at timestamptz
 );
 CREATE INDEX IF NOT EXISTS email_challenges_expiry ON email_challenges(expires_at);
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS vault_sequence bigint NOT NULL DEFAULT 0;
+ALTER TABLE vaults ADD COLUMN IF NOT EXISTS change_sequence bigint NOT NULL DEFAULT 0;
+CREATE INDEX IF NOT EXISTS vaults_changes ON vaults(account_id,change_sequence);
+CREATE TABLE IF NOT EXISTS recovery_batches (
+ challenge_id text PRIMARY KEY REFERENCES challenges(id) ON DELETE CASCADE,
+ cursor text NOT NULL DEFAULT '',
+ digest text NOT NULL
+);
+CREATE TABLE IF NOT EXISTS recovery_vaults (
+ challenge_id text NOT NULL REFERENCES recovery_batches(challenge_id) ON DELETE CASCADE,
+ scope text NOT NULL,
+ expected_revision bigint NOT NULL,
+ ciphertext jsonb,
+ PRIMARY KEY(challenge_id,scope)
+);

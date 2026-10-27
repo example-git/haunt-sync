@@ -186,6 +186,9 @@ func (s *Service) Handler() http.Handler {
 	s.route(mux, "POST /v1/email/link", s.emailLink)
 	s.route(mux, "POST /v1/recovery/start", s.recoveryStart)
 	s.route(mux, "POST /v1/recovery/finish", s.recoveryFinish)
+	s.route(mux, "GET /v1/recovery/{challenge}/vault", s.recoveryNext)
+	s.route(mux, "PUT /v1/recovery/{challenge}/vault/{scope}", s.recoveryStage)
+	s.route(mux, "GET /v1/archive/{scope}", s.archiveChanges)
 	s.route(mux, "GET /v1/vault/{scope}", s.vaultGet)
 	s.route(mux, "GET /v1/vaults", s.vaultOrigins)
 	s.route(mux, "PUT /v1/vault/{scope}", s.vaultPut)
@@ -214,7 +217,7 @@ func (s *Service) Handler() http.Handler {
 					return
 				}
 				// Community pages can operate only delegated OAuth grants, vaults and logout.
-				if !(strings.HasPrefix(r.URL.Path, "/v1/oauth/") || strings.HasPrefix(r.URL.Path, "/v1/vault/") || r.URL.Path == "/v1/devices/current") {
+				if !(strings.HasPrefix(r.URL.Path, "/v1/oauth/") || strings.HasPrefix(r.URL.Path, "/v1/vault/") || strings.HasPrefix(r.URL.Path, "/v1/archive/") || r.URL.Path == "/v1/devices/current") {
 					fail(w, problem(403, "web_scope_required"))
 					return
 				}

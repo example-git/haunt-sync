@@ -19,6 +19,15 @@ fixed versioned domain. Domain-separated keys derived from the resulting root
 wrap recovery material and encrypt full or per-origin snapshots with
 AES-256-GCM. Ciphertexts authenticate the account, issuer, scope, and revision.
 
+Private message archives use the corresponding full or per-origin key, with
+an `archive-chunk:` scope, opaque chunk identifier and revision in authenticated
+data. Scoped devices can access only their origin's archive and change list.
+Archives contain client-compressed text and message metadata; the service
+receives ciphertext and observes chunk sizes and update timing. Password changes
+and recovery re-encrypt every chunk under the new root-derived key, with the same
+atomic commit as settings. Change cursors and per-chunk revisions omit unchanged
+ciphertext; clients reject backwards revisions against their local checkpoints.
+
 OPAQUE follows RFC 9807 with matching Ristretto255/SHA-512 parameters. Its AKE
 session key is shared with the service and is never reused as a payload key.
 Stored device tokens are hashed.
@@ -67,17 +76,23 @@ clients, origins, PKCE values, and proof replays are validated exactly.
 
 Changing either secret first synchronizes pending local edits. The client then
 re-encrypts every stored snapshot and recovery envelope, rotates the recovery
-signing key, and submits a signed complete migration.
+signing key, and stages encrypted replacements one vault at a time. A signed
+hash chain covers the ordered complete migration. Staged ciphertext is bound to
+the account, initiating proof key and challenge, and cannot alter current data
+before the signed commit.
 
 The service commits authentication and ciphertext changes together only if all
 current revisions match. It revokes other devices and in-flight challenges in
-the same operation. The initiating client then uploads a complete snapshot and
-all server scopes, including unchanged data.
+the same operation. The initiating client then uploads settings for all scopes,
+including unchanged settings, and reconciles every archive chunk. Archive text
+that already matches the newly encrypted remote chunk is not uploaded again.
 
 A lost commit acknowledgement is reported as uncertain; the client stops using
 the old session and asks the user to verify the new credentials. An interrupted
-resynchronization remains visibly incomplete until retried. Migration requests
-have a 128 MiB total limit.
+resynchronization remains visibly incomplete until retried. Paged migrations
+have bounded per-vault requests; finalization sends only the signed digest and
+credential envelopes. Stages expire after 15 idle minutes.
+A concurrent write aborts the migration without changing the current keys.
 
 ## Email and recovery
 
@@ -114,5 +129,8 @@ Data that exists only on the lost sync instance cannot be recovered. Sync keeps
 current encrypted state, not archival history; users still need deliberate
 encrypted client backups for disaster recovery.
 
-Client backups have a 20 MiB plaintext limit. That limit is separate from the
-128 MiB complete credential-migration request limit.
+Individual encrypted payloads have a 20 MiB plaintext limit, and vault/staging
+uploads have a 32 MiB HTTP body limit. Archive chunks contain at most 100 messages
+and at most 12 MiB of encoded compressed data. These limits do not cap the total
+archive. The legacy inline credential-migration endpoint retains its 128 MiB
+request limit; current clients use staged migration.
