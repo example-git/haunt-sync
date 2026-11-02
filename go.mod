@@ -4,7 +4,7 @@ go 1.26.9
 
 require (
 	github.com/bytemare/opaque v0.18.0
-	github.com/go-jose/go-jose/v4 v4.1.5
+	github.com/go-jose/go-jose/v4 v4.1.6
 	github.com/jackc/pgx/v5 v5.11.0
 )
 
